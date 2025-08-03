@@ -1,0 +1,65 @@
+[project]
+name = "gnss_explorer"
+version = "0.0.1"
+authors = [{ name = "Andrew Cragg", email = "apcragg@gmail.com" }]
+
+requires-python = ">=3.13"
+
+dependencies = [
+    "numpy>=2.0.2",
+    "numba>=0.60.0",
+    "pylibad9361>=0.2",
+    "pyadi-iio>=0.0.16",
+    "ipython>=8.32.0",
+    "ipykernel>=6.29.5",
+    "typing-extensions>=4.12.2",
+    "pyqt6>=6.8.0",
+    "pyproj>=3.7.1",
+    "pydantic>=2.10.6",
+    "click>=8.1.8",
+    "matplotlib",
+    "cartopy>=0.24.1",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.8.2"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+matplotlib = { git = "https://github.com/matplotlib/matplotlib", rev = "main" }
+
+
+[tool.ruff]
+line-length = 100
+extend-include = ["*.ipynb"]
+select = ["ALL"]
+ignore = [
+    "COM",    # flake8-commas
+    "SIM108", # Annoying ternary operator suggestion
+    "G004",   # f-strings while logging are fine, chill
+    "SIM",    # Let me decide what to simplify
+    "LOG015", # I will use the root logger. Context is for cowards.
+    "D105",   # No need to document magic methods
+]
+
+[dependency-groups]
+lint = ["ruff>=0.9.4"]
+dev = ["pytest>=8.3.4"]
+
+[tool.pyright]
+include = ["gnss_explorer"]
+pythonVersion = "3.13"
+reportFunctionMemberAccess = "error"
+reportImportCycles = "error"
+reportSelfClsParameterName = "error"
+reportTypeCommentUsage = "error"
+reportUnusedClass = "error"
+reportUnusedExpression = "error"
+reportUnusedVariable = "error"
+useLibraryCodeForTypes = true
