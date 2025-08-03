@@ -163,7 +163,7 @@ def main() -> None:
         f_c=FC_SIGNAL,
         p_prn=1,
         p_agc_alpha=0.1,
-        f_fll_bw=15,
+        f_fll_bw=10,
         f_pll_bw=5,
         f_dll_bw=5,
         n_subframe_lock=2,
@@ -261,12 +261,12 @@ def main() -> None:
             plt.ylabel("Amplitude")
             plt.xlabel("Time (s)")
 
-            t_calc_offset = 2.0
+            t_calc_offset = 2
             n_off = int(t_calc_offset / nav.T_CODE)
             t_calc_offset = n_off * nav.T_CODE
 
             b_code_phase_trunc = b_code_phase[n_off:]
-            resid = np.polynomial.Polynomial.fit(
+            resid = np.polynomial.polynomial.Polynomial.fit(
                 range(len(b_code_phase_trunc)), b_code_phase_trunc, deg=2
             )
 

@@ -36,10 +36,10 @@ def _generate_g1_g2() -> tuple[list[int], list[int]]:
         g2_feedback = g2[1] ^ g2[2] ^ g2[5] ^ g2[7] ^ g2[8] ^ g2[9]
 
         # Shift G1 register
-        g1 = [g1_feedback] + g1[:-1]
+        g1 = [g1_feedback, *g1[:-1]]
 
         # Shift G2 register
-        g2 = [g2_feedback] + g2[:-1]
+        g2 = [g2_feedback, *g2[:-1]]
 
     return g1_sequence, g2_sequence
 

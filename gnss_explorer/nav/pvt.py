@@ -17,39 +17,34 @@ N_MIN_SV_FOR_SOLUTION = 4
 N_MAX_ITR = 10
 
 
-class Vec3d(np.ndarray):
-    """A 3D vector class that subclasses numpy.ndarray."""
+@dataclasses.dataclass(frozen=True)
+class Vec3d:
+    """3d Vector."""
 
-    def __new__(cls, x: float = 0, y: float = 0, z: float = 0) -> "Vec3d":
-        """Create new Vec3d."""
-        # Create a new numpy array with the specified x, y, and z components
-        return np.asarray([x, y, z], dtype=float).view(cls)
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
 
-    @property
-    def x(self):
-        return self[0]
+    def __add__(self, other: "Vec3d") -> "Vec3d":
+        return Vec3d(self.x + other.x, self.y + other.y, self.z + other.z)
 
-    @x.setter
-    def x(self, value: float):
-        self[0] = value
+    def __sub__(self, other: "Vec3d") -> "Vec3d":
+        return Vec3d(self.x - other.x, self.y - other.y, self.z - other.z)
 
-    @property
-    def y(self):
-        return self[1]
+    def __neg__(self) -> "Vec3d":
+        return Vec3d(-self.x, -self.y, -self.z)
 
-    @y.setter
-    def y(self, value: float):
-        self[1] = value
+    def to_tuple(self) -> tuple[float, float, float]:
+        return (self.x, self.y, self.z)
 
-    @property
-    def z(self):
-        return self[2]
+    def to_ndarray(self) -> npt.NDArray[np.float64]:
+        return np.array(self.to_tuple(), dtype=float)
 
-    @z.setter
-    def z(self, value: float):
-        self[2] = value
+    # allow numpy to convert it automatically
+    def __array__(self, dtype: npt.DTypeLike = None) -> npt.NDArray[np.float64]:
+        return np.array(self.to_tuple(), dtype=dtype if dtype is not None else float)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Vec3d(x={self.x}, y={self.y}, z={self.z})"
 
 

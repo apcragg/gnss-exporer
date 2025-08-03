@@ -109,8 +109,8 @@ class FrameSync:
     def process(self, symbol: symbol_sync.L1CASymbol) -> nav.NavSubframe | None:
         """TODO."""
         bit = 1 if symbol.symbol.real > 0.0 else 0
-        self.b_subframe_bits = [bit] + self.b_subframe_bits[:-1]
-        self.b_subframe_symbols = [symbol] + self.b_subframe_symbols[:-1]
+        self.b_subframe_bits = [bit, *self.b_subframe_bits[:-1]]
+        self.b_subframe_symbols = [symbol, *self.b_subframe_symbols[:-1]]
 
         subframe = None
         if self.state is FrameSyncState.SEARCHING:

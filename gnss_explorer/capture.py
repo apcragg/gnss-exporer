@@ -22,7 +22,7 @@ T_DEFAULT_CAPTURE = 1.0
 @click.option("--t-capture", type=float, default=T_DEFAULT_CAPTURE)
 @click.option("--timestamp", is_flag=True)
 def main(
-    addr: str, file_path: pathlib.Path, fs: int, fc: float, t_capture: int, timestamp: bool
+    addr: str, file_path: pathlib.Path, fs: int, fc: float, t_capture: int, *, timestamp: bool
 ) -> None:
     """Capture samples from a PlutoSDR."""
     rx = adi.Pluto(f"ip:{addr}")
@@ -46,6 +46,7 @@ def main(
     x_capture = np.zeros(n_capture, dtype=np.complex64)
 
     n_buf = 0
+    x = np.array([], dtype=np.complex64)
     while n_buf < n_capture:
         n_to_capture = min(rx.rx_buffer_size, n_capture - n_buf)
 
