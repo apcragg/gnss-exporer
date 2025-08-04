@@ -23,13 +23,12 @@ T_CODE = 1e-3
 F_CODE = 1 / T_CODE
 GPS_L1_CA_CHIPS = 1023
 FS_CHIP = GPS_L1_CA_CHIPS / T_CODE
-N_P_SYMBOLS = 20
 HALF_SAMPLE = 0.5
 
-CODE_OFFSET_NARROW = 0.50
+CODE_OFFSET_NARROW = 0.10
 CODE_OFFSET_WIDE = 0.50
 
-N_INT_CODE = nav.N_P_SYMBOLS
+N_INT_CODE = nav.N_P_SYMBOLS * 2
 
 
 @dataclasses.dataclass()
@@ -244,8 +243,10 @@ class L1CAReceiver:
             phase=self.p_last_nco_phase_carrier,
         )
 
+        total_shift_hz = self.carrier_tracking_loop.freq_estimate / (2 * np.pi)
+
         x_corr_prompt = self._run_dll_discrim(samples=samples)
-        self.delay_locked_loop.step()
+        self.delay_locked_loop.step(carrier_freq_est=total_shift_hz)
         pseudo_symbol = x_corr_prompt * self.agc_loop.gain
 
         self.carrier_tracking_loop.update(pseudo_symbol)
@@ -276,7 +277,7 @@ class L1CAReceiver:
         self.b_gain.append(self.agc_loop.gain)
         self.b_pseudo_symbols.append(pseudo_symbol)
         self.b_code_phase.append(t_receiver)
-        self.b_carrier_phase.append(self.carrier_tracking_loop.error)
+        self.b_carrier_phase.append(self.delay_locked_loop.timing_error)
         self.b_carrier_est.append(self.carrier_tracking_loop.sum_e)
 
         return symbol_sync.L1CAPseudoSymbol(

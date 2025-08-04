@@ -24,6 +24,7 @@ class DelayLockedLoop:
 
         self.offset = 0.0  # Current offset in samples
         self.freq_est_hz = 0.0
+        self.timing_error = 0.0
 
     def update(self, timing_error: float) -> None:
         """Update the delay offset based on the timing error from the discriminator.
@@ -35,6 +36,7 @@ class DelayLockedLoop:
             offset: The updated offset in fractional samples.
 
         """
+        self.timing_error = timing_error
         # Compute the control signal using the PI controller
         self.freq_est_hz += self.k2 * timing_error
         # Update the offset
@@ -45,11 +47,11 @@ class DelayLockedLoop:
         # The relationship for L1 is f_code_doppler = f_carrier_doppler / 1540
         # T_CODE is 1e-3, so we must scale correctly.
         # The carrier_freq_est is in Hz. The DLL freq_est is in samples/ms.
-        # This scaling may need tuning based on your units.
         aiding_term = carrier_freq_est / 1540.0  # Divided by N_P_SYMBOLS
-        self.offset += self.freq_est_hz * self.period  # + (aiding_term * self.period)
+        self.offset += self.freq_est_hz * self.period - (aiding_term * self.period)
 
     def reset(self) -> None:
         """Reset the integrator and offset to zero."""
         self.freq_est_hz = 0.0
         self.offset = 0.0
+        self.aiding_term = 0.0
