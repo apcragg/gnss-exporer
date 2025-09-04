@@ -247,7 +247,7 @@ class PvtSolver:
 
         # Initial guess at the center of the earth
         p_hat_user = Vec3d()
-        t_receiver_bias_m = 0  # [m]
+        t_receiver_bias_m = self.t_clock_bias if self.t_clock_bias else 0.0  # [m]
 
         # Least squares iterations
         n_itr = 0
@@ -263,7 +263,7 @@ class PvtSolver:
 
             h = self._build_h(p_svs=p_svs, p_hat_user=p_hat_user)
 
-            (p_hat_user_update, *_) = np.linalg.lstsq(h, rho_delta, rcond=None)
+            (p_hat_user_update, *_) = np.linalg.lstsq(h, rho_delta, rcond=1e-12)
 
             p_hat_user = p_hat_user + Vec3d(
                 p_hat_user_update[0], p_hat_user_update[1], p_hat_user_update[2]

@@ -28,14 +28,11 @@ FS_SIGNAL = 4.0e6 * (1.0000)  # add some PPMs
 ACTIVE_PRNS = list(range(32))
 
 N_RX = 100_000
-T_LOAD_S = 120
+T_LOAD_S = 60
 N_LOAD = int(FS_SIGNAL * T_LOAD_S)
 
 N_YEILD_DEAULT = int(1e5)
-
-# Site location: Berkeley, Alameda County, California, United States
-# 37.858429 lat, -122.273754 lon, 37.00 m alt
-ecef_ant = (-2692314.79174219165, -4263143.23363866005, 3893072.19487998961)
+N_FRAMES_DETECT = 10
 
 
 class CaptureBinaryFormat(enum.Enum):
@@ -176,7 +173,7 @@ def main() -> None:
         prn_config.p_prn = prn
         receivers[prn] = l1ca.L1CAReceiver(config=prn_config, solver=solver)
         detectors[prn] = l1ca_detector.L1CADetector(
-            f_s=FS_SIGNAL, f_max_doppler=10e3, f_step_doppler=250, p_ratio_threshold=1.7
+            f_s=FS_SIGNAL, f_max_doppler=10e3, f_step_doppler=250, p_ratio_threshold=1.5
         )
 
     t_start = time.time()
@@ -187,7 +184,7 @@ def main() -> None:
         if prn_to_detect == n_pos:
             if receivers[prn_to_detect].state is l1ca.L1CAReceiverState.IDLE:
                 detection = detectors[prn_to_detect].process(
-                    frame=x[: detectors[prn_to_detect].n_frame],
+                    frame=x[: detectors[prn_to_detect].n_frame * N_FRAMES_DETECT],
                     p_prn=prn_to_detect,
                 )
                 if detection:
@@ -232,7 +229,7 @@ def main() -> None:
             data_c_n0_nwpr = np.convolve(data_c_n0_nwpr, [0.1] * 10, mode="full")[: -(10 - 1)]
 
             plt.figure()
-            ax1 = plt.subplot(2, 3, 1)
+            ax1 = plt.subplot(2, 4, 1)
             plt.title(f"Symbols - PRN {prn}")
             plt.grid()
             plt.xlabel("Time (s)")
@@ -240,20 +237,20 @@ def main() -> None:
             plt.plot(t_symbol_loop, data_imag, ".r")
             plt.axis((0.0, T_LOAD_S, -1.25, 1.25))
 
-            ax2 = plt.subplot(2, 3, 2, sharex=ax1)
-            plt.title(f"(XXX carrier phase) AGC Loop Gain - PRN {prn}")
+            ax2 = plt.subplot(2, 4, 2, sharex=ax1)
+            plt.title(f"AGC Loop Gain - PRN {prn}")
             plt.grid()
             plt.xlabel("Time (s)")
-            plt.plot(t_pseudo_symbol_loop, receivers[prn].b_carrier_phase)
+            plt.plot(t_pseudo_symbol_loop, receivers[prn].b_gain)
 
-            ax2 = plt.subplot(2, 3, 3, sharex=ax1)
+            ax3 = plt.subplot(2, 4, 3, sharex=ax2)
             plt.title(f"C/N_0 - PRN {prn}")
             plt.grid()
             plt.xlabel("Time (s)")
             plt.plot(t_symbol_loop, data_c_n0_mm, "bo-")
             plt.plot(t_symbol_loop, data_c_n0_nwpr, "ro-")
 
-            ax3 = plt.subplot(2, 3, 4, sharex=ax2)
+            ax4 = plt.subplot(2, 4, 4, sharex=ax3)
             plt.title("Psudeo Symbols")
             plt.grid()
             plt.plot(t_pseudo_symbol_loop[:], np.real(receivers[prn].b_pseudo_symbols), "bo-")
@@ -273,7 +270,7 @@ def main() -> None:
             t_resid = np.arange(-n_off, -n_off + len(b_code_phase))
             b_code_resid = (b_code_phase - resid(t_resid)) * 1e9 * FS_SIGNAL
 
-            ax4 = plt.subplot(2, 3, 5, sharex=ax3)
+            ax5 = plt.subplot(2, 4, 5, sharex=ax4)
             plt.plot(t_pseudo_symbol_loop, b_code_resid)
             plt.vlines(
                 t_calc_offset, min(b_code_resid), max(b_code_resid), color="k", linestyles="dashed"
@@ -283,12 +280,23 @@ def main() -> None:
             plt.ylabel("Nanoseconds")
             plt.grid()
 
-            plt.subplot(2, 3, 6, sharex=ax4)
+            ax6 = plt.subplot(2, 4, 6, sharex=ax5)
             plt.title(f"Carrier Estimate - PRN {prn}")
             plt.grid()
             plt.xlabel("Time (s)")
             plt.plot(t_pseudo_symbol_loop, receivers[prn].b_carrier_est)
 
+            ax7 = plt.subplot(2, 4, 7, sharex=ax6)
+            plt.title(f"Code Error - PRN {prn}")
+            plt.grid()
+            plt.xlabel("Time (s)")
+            plt.plot(t_pseudo_symbol_loop, receivers[prn].b_code_error)
+
+            plt.subplot(2, 4, 8, sharex=ax7)
+            plt.title(f"Code Phase Uncorrected - PRN {prn}")
+            plt.grid()
+            plt.xlabel("Time (s)")
+            plt.plot(t_pseudo_symbol_loop, receivers[prn].b_code_phase_uncorr)
     plt.show()
 
 

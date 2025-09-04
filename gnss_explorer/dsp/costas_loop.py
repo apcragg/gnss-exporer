@@ -15,6 +15,9 @@ class LoopState(enum.Enum):
 class CarrierTrackingLoop:
     """Carrier tracking loop."""
 
+    freq_estimate: float
+    start_pll: bool
+
     def __init__(self, *, fll_bw: float, pll_bw: float, sample_rate: float) -> None:
         """Create a Costas carrier tracking loop.
 
@@ -29,14 +32,13 @@ class CarrierTrackingLoop:
         self.pll_bw = pll_bw
         self.sample_rate = sample_rate
         self.T = 1.0 / sample_rate
-        self.phase_estimate = 0.0
         self.freq_estimate = 0.0
         self.error = 0.0
         # FLL
         zeta = 0.707
         wn = fll_bw * 8 * zeta / (4 * zeta**2 + 1)
-        self.fll_k1 = 2 * zeta * wn * self.T
-        self.fll_k2 = (wn * self.T) ** 2
+        self.fll_k1 = 2 * zeta * wn
+        self.fll_k2 = (wn) ** 2
         # PLL
         zeta = 0.707
         wn = pll_bw * 8 * zeta / (4 * zeta**2 + 1)
@@ -45,10 +47,10 @@ class CarrierTrackingLoop:
 
         self.n = 0
 
-    def _fold_mod_pi(self, theta: float) -> complex:
-        """Fold angle to [-pi/2, +pi/2] by modulo-π mapping.
+    def _fold_mod_pi(self, theta: float) -> float:
+        """Fold angle to [-pi/2, +pi/2] by modulo-pi mapping.
 
-        This cancels ±π jumps caused by data-bit flips.
+        This cancels +/-pi jumps caused by data-bit flips.
         """
         return ((theta + 0.5 * np.pi) % np.pi) - 0.5 * np.pi
 
@@ -66,35 +68,45 @@ class CarrierTrackingLoop:
             self.prev_sym = input_signal
             return
 
-        if self.state == LoopState.PLL:
-            # Calculate error signal
-            self.error = np.atan(input_signal.imag / input_signal.real)
+        # PLL
+        self.error = np.atan(input_signal.imag / input_signal.real)
+        self.sum_e_pll += self.pll_k2 * self.error * self.T
+        self.freq_estimate_pll = self.pll_k1 * self.error + self.sum_e_pll
 
-            self.sum_e += self.pll_k2 * self.error * self.T
+        # FLL
+        d_phi = np.angle(input_signal * np.conj(self.prev_sym))  # [T * rad/s]
+        omega_mes = self._fold_mod_pi(d_phi)
 
-            self.freq_estimate = self.pll_k1 * self.error + self.sum_e
-        else:
-            d_phi = np.angle(input_signal * np.conj(self.prev_sym))
-            omega_mes = self._fold_mod_pi(d_phi)
+        self.error = omega_mes  # [T * rad/s]
 
-            self.error = omega_mes * self.sample_rate  # [rad/s]
+        self.sum_e += self.error
+        self.freq_estimate_fll = (
+            self.fll_k1 * self.error + (self.sum_e * self.fll_k2) * self.T * 0.5
+        )
 
-            self.sum_e += self.error
-            self.freq_estimate += self.fll_k2 * self.sum_e + self.fll_k1 * self.error
-
-        self.phase_estimate = self.phase_estimate % (2 * np.pi)
+        self.freq_estimate = self.freq_estimate_pll * 1 + self.freq_estimate_fll * 1
 
         self.prev_sym = input_signal
         self.n += 1
-        if self.n == 2000:
+
+        if self.start_pll:
+            self.start_pll = False
+
+        if self.n == 3000:
             self.state = LoopState.PLL
-            self.sum_e = self.freq_estimate
+            self.start_pll = True
+
+    @property
+    def frequency_estimate(self) -> float:
+        return self.freq_estimate
 
     def reset(self) -> None:
         """Reset the tracking loop."""
-        self.phase_estimate = 0.0
-        self.freq_estimate = 0.0
+        self.freq_estimate_pll = 0.0
+        self.freq_estimate_fll = 0.0
         self.error = 0.0
         self.prev_sym = None
         self.f_ll_integrator = 0
-        self.sum_e = 0
+        self.sum_e_pll: float = 0
+        self.sum_e: float = 0
+        self.start_pll = False

@@ -18,6 +18,8 @@ class AgcMode(enum.Enum):
 class AutomaticGainControl:
     """Basic moving average gain control."""
 
+    gain: float
+
     def __init__(
         self,
         alpha: float,

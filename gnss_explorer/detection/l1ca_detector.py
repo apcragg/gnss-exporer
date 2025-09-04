@@ -13,7 +13,7 @@ from gnss_explorer.nav import nav
 DEFAULT_F_DOPPLER_MAX_HZ = 25e3
 DEFAULT_F_DOPPLER_STEP_HZ = 250
 
-DEFAULT_DETECTION_THRESHOLD = 50
+DEFAULT_DETECTION_THRESHOLD = 100
 
 
 @dataclasses.dataclass
@@ -58,10 +58,14 @@ class L1CADetector:
 
         """
         n_frame = self.n_frame
-        if len(frame) != n_frame:
-            logging.error(f"Frame size {len(frame)} does not match expected frame size {n_frame}")
+        if len(frame) % n_frame != 0:
+            logging.error(
+                f"Input buffer length {len(frame)} not multiple expected frame size {n_frame}"
+            )
             msg = "Frame size mismatch"
             raise ValueError(msg)
+
+        n_int = len(frame) // n_frame
 
         x_code = ca_code.ca_code_dll(self.f_oversample, 0.0, p_prn, n_frame)
         fft_code = np.conj(np.fft.fft(x_code, n_frame))
@@ -79,13 +83,17 @@ class L1CADetector:
         corrs = []
 
         for doppler in doppler_range:
-            t = sample_idx * doppler
-            shift = np.exp(-2j * np.pi * t)
+            corr = 0
+            phase = 1
+            for idx in range(n_int):
+                t = sample_idx * doppler
+                shift = np.exp(-2j * np.pi * t)
 
-            x_shifted = frame * shift
+                x_shifted = frame[idx * n_frame : (idx + 1) * n_frame] * shift * phase
+                phase = shift[-1]
 
-            fft_x = np.fft.fft(x_shifted)
-            corr = (abs(np.fft.ifft(fft_code * fft_x)) / nav.GPS_L1_CA_CHIPS) ** 2
+                fft_x = np.fft.fft(x_shifted)
+                corr += (abs((np.fft.ifft(fft_code * fft_x)) / nav.GPS_L1_CA_CHIPS) ** 2) / n_int
 
             corrs.extend(corr)
 
@@ -96,6 +104,7 @@ class L1CADetector:
                 best_doppler = doppler
 
         corrs.sort()
+        # XXX: Don't hardcode detection ratio correlation window
         ratio = corrs[-1] / corrs[-(4 * 5)]
 
         logging.debug(f"Best Correlation: {best_corr:.3f}, PRN {p_prn}, Ratio: {ratio:.3f}")
