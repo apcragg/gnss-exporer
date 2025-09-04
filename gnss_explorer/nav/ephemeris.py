@@ -107,7 +107,7 @@ class GpsEphemeris:
 
     def is_valid(self) -> bool:
         """Ephemerides received recently and with valid issue time."""
-        # XXX: Implement ephemeris validity check.
+        # XXX(apcragg): Implement ephemeris validity check.
         return True
 
     def _calculate_position(self, t: float, *, is_eci: bool) -> tuple[float, float, float]:

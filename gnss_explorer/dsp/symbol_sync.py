@@ -10,7 +10,7 @@ from numpy import typing as npt
 
 from gnss_explorer.nav import nav
 
-DEFAULT_N_CHECK_FOR_LOCK = 200
+DEFAULT_N_CHECK_FOR_LOCK = 2000
 DEFAULT_N_FLYWHEEL_MAX = 10
 
 
@@ -131,9 +131,6 @@ class SymbolSync:
             self.n_count = (self.n_count + 1) % nav.N_BITS_SUBFRAME
 
         if start_of_word:
-            if self.n_count is not None:
-                if self.n_count != 0:
-                    print("unexpected n count", self.n_count, self.p_prn)
             self.n_count = 0
             self.b_start_of_word = False
 

@@ -24,6 +24,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["ruff>=0.8.2"]
 
+dev-dependencies = ["pyright>=1.1"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -38,21 +40,26 @@ matplotlib = { git = "https://github.com/matplotlib/matplotlib", rev = "main" }
 [tool.ruff]
 line-length = 100
 extend-include = ["*.ipynb"]
-select = ["ALL"]
-ignore = [
+lint.select = ["ALL"]
+lint.ignore = [
     "COM",    # flake8-commas
     "SIM108", # Annoying ternary operator suggestion
     "G004",   # f-strings while logging are fine, chill
     "SIM",    # Let me decide what to simplify
     "LOG015", # I will use the root logger. Context is for cowards.
     "D105",   # No need to document magic methods
+    "D417"
 ]
+lint.pydocstyle.convention = "google"
 
 [dependency-groups]
 lint = ["ruff>=0.9.4"]
 dev = ["pytest>=8.3.4"]
 
 [tool.pyright]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "standard"
 include = ["gnss_explorer"]
 pythonVersion = "3.13"
 reportFunctionMemberAccess = "error"
