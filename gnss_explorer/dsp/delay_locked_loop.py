@@ -16,14 +16,22 @@ class DelayLockedLoop:
         self.period = 1.0 / sample_rate
 
         # Loop filter design
-        zeta = 0.707
-        wn = 8 * bandwidth * zeta / (4 * zeta**2 + 1)
-
-        self.k1 = 2 * zeta * wn * self.period
-        self.k2 = (wn * self.period) ** 2
+        self.update_noise_bw(noise_bw_hz=bandwidth)
 
         self.offset = 0.0  # Current offset in samples
         self.freq_est_hz = 0.0
+
+    def update_noise_bw(self, noise_bw_hz: float) -> None:
+        """Update loop filter coefficients for new noise bandwidth.
+
+        Args:
+            noise_bw: Noise bandwidth in Hz.
+        """
+        zeta = 0.707
+        wn = 8 * noise_bw_hz * zeta / (4 * zeta**2 + 1)
+
+        self.k1 = 2 * zeta * wn * self.period
+        self.k2 = (wn * self.period) ** 2
 
     def update(self, timing_error: float) -> None:
         """Update the delay offset based on the timing error from the discriminator.

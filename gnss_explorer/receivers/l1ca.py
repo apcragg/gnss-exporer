@@ -26,7 +26,7 @@ FS_CHIP = GPS_L1_CA_CHIPS / T_CODE
 N_P_SYMBOLS = 20
 HALF_SAMPLE = 0.5
 
-CODE_OFFSET_NARROW = 0.05
+CODE_OFFSET_NARROW = 0.2
 CODE_OFFSET_WIDE = 0.5
 
 N_INT_CODE = nav.N_P_SYMBOLS
@@ -216,6 +216,7 @@ class L1CAReceiver:
         if self.b_narrow_correlator and self.n_dll_count_accumulate == 0:
             self.b_narrow_correlator = False
             self.p_code_discim_offset = CODE_OFFSET_NARROW
+            # self.delay_locked_loop.update_noise_bw(2)
 
         discrim *= 1.0 - self.p_code_discim_offset
         self.p_dll_err_accumulate += discrim
@@ -259,9 +260,9 @@ class L1CAReceiver:
 
         # T/2 correction
         # Carrier estimate is for the middle of the integration window
-        self.p_last_nco_phase_carrier *= np.exp(
-            -1j * self.carrier_tracking_loop.freq_estimate * self.carrier_tracking_loop.T / 2
-        )
+        # self.p_last_nco_phase_carrier *= np.exp(
+        #     -1j * self.carrier_tracking_loop.freq_estimate * self.carrier_tracking_loop.T / 2
+        # )
 
         self.agc_loop.update(x_corr_prompt)
 
@@ -281,12 +282,12 @@ class L1CAReceiver:
             - (self.delay_locked_loop.offset / self.config.f_oversample)
         ) / self.config.f_s
 
-        self.b_gain.append(self.agc_loop.gain)
+        self.b_gain.append(self.carrier_tracking_loop.error)
         self.b_pseudo_symbols.append(pseudo_symbol)
         self.b_code_phase.append(t_receiver)
         self.b_code_error.append(self.delay_locked_loop.timing_error)
         self.b_code_phase_uncorr.append(self.delay_locked_loop.offset)
-        self.b_carrier_est.append(self.carrier_tracking_loop.error)
+        self.b_carrier_est.append(self.carrier_tracking_loop.freq_estimate)
 
         return symbol_sync.L1CAPseudoSymbol(
             p_prn=self.config.p_prn,

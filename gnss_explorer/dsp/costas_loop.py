@@ -75,14 +75,10 @@ class CarrierTrackingLoop:
 
         # FLL
         d_phi = np.angle(input_signal * np.conj(self.prev_sym))  # [T * rad/s]
-        omega_mes = self._fold_mod_pi(d_phi)
+        omega_mes = self._fold_mod_pi(d_phi)  # [T * rad/s]
 
-        self.error = omega_mes  # [T * rad/s]
-
-        self.sum_e += self.error
-        self.freq_estimate_fll = (
-            self.fll_k1 * self.error + (self.sum_e * self.fll_k2) * self.T * 0.5
-        )
+        self.sum_e += omega_mes
+        self.freq_estimate_fll = self.fll_k1 * omega_mes + (self.sum_e * self.fll_k2) * self.T * 0.5
 
         self.freq_estimate = self.freq_estimate_pll * 1 + self.freq_estimate_fll * 1
 
@@ -92,9 +88,9 @@ class CarrierTrackingLoop:
         if self.start_pll:
             self.start_pll = False
 
-        if self.n == 3000:
-            self.state = LoopState.PLL
-            self.start_pll = True
+        # if self.n == 3000:
+        #     self.state = LoopState.PLL
+        #     self.start_pll = True
 
     @property
     def frequency_estimate(self) -> float:

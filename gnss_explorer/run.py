@@ -24,11 +24,11 @@ from gnss_explorer.receivers import l1ca
 logging.getLogger().setLevel(logging.INFO)
 
 FC_SIGNAL = 1575.420e6
-FS_SIGNAL = 4.0e6 * (1.0000)  # add some PPMs
+FS_SIGNAL = 4.0e6 * (1.0 + 12.7e-6)  # add some PPMs
 ACTIVE_PRNS = list(range(32))
 
 N_RX = 100_000
-T_LOAD_S = 60
+T_LOAD_S = 120
 N_LOAD = int(FS_SIGNAL * T_LOAD_S)
 
 N_YEILD_DEAULT = int(1e5)
@@ -114,7 +114,7 @@ def file_source_complex_mmap(
     if len(x) % 2 == 1:
         logging.error("Complex binary file should have even number of samples.")
         raise RuntimeError
-    idx = 0
+    idx = int(4e6)
     n_samples = len(x)
     if n_load:
         n_samples = np.minimum(n_load * 2, n_samples)
@@ -141,12 +141,20 @@ def main() -> None:
     """TODO."""
     n_load = int(T_LOAD_S * FS_SIGNAL)
 
+    # x_stream = file_source_complex_mmap(
+    #     pathlib.Path("/home/apcragg/Documents/gps.bin"),
+    #     capture_format=CaptureBinaryFormat.FILE_I16,
+    #     n_yield=N_RX,
+    #     n_load=n_load,
+    #     f_shift=0,
+    # )
+
     x_stream = file_source_complex_mmap(
-        pathlib.Path("/home/apcragg/Documents/gps.bin"),
-        capture_format=CaptureBinaryFormat.FILE_I16,
+        pathlib.Path("/home/apcragg/Documents/porch.bin"),
+        capture_format=CaptureBinaryFormat.FILE_NUMPY_C64,
         n_yield=N_RX,
         n_load=n_load,
-        f_shift=0,
+        f_shift=25e3,
     )
 
     receivers: dict[int, l1ca.L1CAReceiver] = {}
@@ -160,9 +168,9 @@ def main() -> None:
         f_c=FC_SIGNAL,
         p_prn=1,
         p_agc_alpha=0.1,
-        f_fll_bw=10,
+        f_fll_bw=25,
         f_pll_bw=5,
-        f_dll_bw=5,
+        f_dll_bw=25,
         n_subframe_lock=2,
         n_flywheel_allowed=10,
         b_sync_pattern=np.array([1, 0, 0, 0, 1, 0, 1, 1]),
@@ -258,7 +266,7 @@ def main() -> None:
             plt.ylabel("Amplitude")
             plt.xlabel("Time (s)")
 
-            t_calc_offset = 2
+            t_calc_offset = 0
             n_off = int(t_calc_offset / nav.T_CODE)
             t_calc_offset = n_off * nav.T_CODE
 
