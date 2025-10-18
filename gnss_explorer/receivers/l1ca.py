@@ -242,13 +242,13 @@ class L1CAReceiver:
         self.p_last_nco_phase_carrier = common.freq_shift(
             samples,
             fs=self.config.f_s,
-            f_shift=(self.carrier_tracking_loop.frequency_estimate / (2 * np.pi)),
+            f_shift=(self.carrier_tracking_loop.freq_estimate / (2 * np.pi)),
             phase=self.p_last_nco_phase_carrier,
         )
 
         x_corr_prompt = self._run_dll_discrim(samples=samples)
 
-        freq_aid = self.f_doppler + self.carrier_tracking_loop.frequency_estimate / (2 * np.pi)
+        freq_aid = self.f_doppler + self.carrier_tracking_loop.freq_estimate / (2 * np.pi)
 
         if self.carrier_tracking_loop.state == costas_loop.LoopState.FLL:
             freq_aid = 0

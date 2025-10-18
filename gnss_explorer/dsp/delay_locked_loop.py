@@ -52,9 +52,7 @@ class DelayLockedLoop:
     def step(self, carrier_freq_est: float = 0.0, start_aiding: bool = False) -> None:
         """Step the loop using an optional aiding frequency."""
         # The relationship for L1 is f_code_doppler = f_carrier_doppler / 1540
-        # T_CODE is 1e-3, so we must scale correctly.
         # The carrier_freq_est is in Hz. The DLL freq_est is in samples/ms.
-        # This scaling may need tuning based on your units.
         aiding_term = 0.05 * carrier_freq_est / 1540.0  # Divided by N_P_SYMBOLS
 
         if start_aiding:

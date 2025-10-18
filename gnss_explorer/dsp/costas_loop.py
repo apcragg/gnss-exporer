@@ -88,14 +88,6 @@ class CarrierTrackingLoop:
         if self.start_pll:
             self.start_pll = False
 
-        # if self.n == 3000:
-        #     self.state = LoopState.PLL
-        #     self.start_pll = True
-
-    @property
-    def frequency_estimate(self) -> float:
-        return self.freq_estimate
-
     def reset(self) -> None:
         """Reset the tracking loop."""
         self.freq_estimate_pll = 0.0
