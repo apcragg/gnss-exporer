@@ -26,7 +26,7 @@ FS_CHIP = GPS_L1_CA_CHIPS / T_CODE
 N_P_SYMBOLS = 20
 HALF_SAMPLE = 0.5
 
-CODE_OFFSET_NARROW = 0.2
+CODE_OFFSET_NARROW = 0.05
 CODE_OFFSET_WIDE = 0.5
 
 N_INT_CODE = nav.N_P_SYMBOLS
@@ -216,7 +216,6 @@ class L1CAReceiver:
         if self.b_narrow_correlator and self.n_dll_count_accumulate == 0:
             self.b_narrow_correlator = False
             self.p_code_discim_offset = CODE_OFFSET_NARROW
-            # self.delay_locked_loop.update_noise_bw(2)
 
         discrim *= 1.0 - self.p_code_discim_offset
         self.p_dll_err_accumulate += discrim
@@ -232,28 +231,24 @@ class L1CAReceiver:
     def _pseudo_symbol_tracking(
         self, samples: npt.NDArray[np.complex64], n_frame_global_pos: int
     ) -> symbol_sync.L1CAPseudoSymbol:
+        f_total_carrier_freq = self.f_doppler + (
+            self.carrier_tracking_loop.freq_estimate / (2 * np.pi)
+        )
+
         self.p_last_nco_phase = common.freq_shift(
             samples,
             fs=self.config.f_s,
-            f_shift=self.f_doppler,
+            f_shift=f_total_carrier_freq,
             phase=self.p_last_nco_phase,
         )
 
-        self.p_last_nco_phase_carrier = common.freq_shift(
-            samples,
-            fs=self.config.f_s,
-            f_shift=(self.carrier_tracking_loop.freq_estimate / (2 * np.pi)),
-            phase=self.p_last_nco_phase_carrier,
-        )
-
         x_corr_prompt = self._run_dll_discrim(samples=samples)
+        pseudo_symbol = x_corr_prompt * self.agc_loop.gain
+        self.carrier_tracking_loop.update(pseudo_symbol)
 
-        freq_aid = self.f_doppler + self.carrier_tracking_loop.freq_estimate / (2 * np.pi)
-
-        if self.carrier_tracking_loop.state == costas_loop.LoopState.FLL:
-            freq_aid = 0
-
-        self.delay_locked_loop.step(freq_aid, start_aiding=self.carrier_tracking_loop.start_pll)
+        self.delay_locked_loop.step(
+            f_total_carrier_freq, start_aiding=self.carrier_tracking_loop.start_pll
+        )
 
         pseudo_symbol = x_corr_prompt * self.agc_loop.gain
         self.carrier_tracking_loop.update(pseudo_symbol)
@@ -266,10 +261,10 @@ class L1CAReceiver:
 
         self.agc_loop.update(x_corr_prompt)
 
-        if self.delay_locked_loop.offset > self.config.f_oversample:
+        if self.delay_locked_loop.offset > HALF_SAMPLE:
             self.delay_locked_loop.offset -= self.config.f_oversample * 1
             self.n_code_track_offset = -1
-        elif self.delay_locked_loop.offset < -self.config.f_oversample:
+        elif self.delay_locked_loop.offset < -HALF_SAMPLE:
             self.delay_locked_loop.offset += self.config.f_oversample * 1
             self.n_code_track_offset = 1
         else:
@@ -287,7 +282,7 @@ class L1CAReceiver:
         self.b_code_phase.append(t_receiver)
         self.b_code_error.append(self.delay_locked_loop.timing_error)
         self.b_code_phase_uncorr.append(self.delay_locked_loop.offset)
-        self.b_carrier_est.append(self.carrier_tracking_loop.freq_estimate)
+        self.b_carrier_est.append(self.carrier_tracking_loop.integrator)
 
         return symbol_sync.L1CAPseudoSymbol(
             p_prn=self.config.p_prn,

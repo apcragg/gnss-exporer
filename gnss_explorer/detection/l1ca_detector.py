@@ -5,6 +5,8 @@ from __future__ import annotations
 import dataclasses
 import logging
 
+# Import necessary libraries for plotting
+import matplotlib.pyplot as plt
 import numpy as np
 
 from gnss_explorer.dsp import ca_code
@@ -82,6 +84,13 @@ class L1CADetector:
 
         corrs = []
 
+        # --- Visualization Data Storage ---
+        # Only store data if the PRN is 6
+        if p_prn == 24:
+            all_corrs_3d = []
+        # ------------------------------------
+
+        # Non-coherent correlation
         for doppler in doppler_range:
             corr = 0
             phase = 1
@@ -95,6 +104,11 @@ class L1CADetector:
                 fft_x = np.fft.fft(x_shifted)
                 corr += (abs((np.fft.ifft(fft_code * fft_x)) / nav.GPS_L1_CA_CHIPS) ** 2) / n_int
 
+            # --- Store this doppler slice for visualization ---
+            if p_prn == 24:
+                all_corrs_3d.append(corr)
+            # ----------------------------------------------------
+
             corrs.extend(corr)
 
             current_max = corr.max()
@@ -102,6 +116,29 @@ class L1CADetector:
                 best_corr = current_max
                 idx_max = int(corr.argmax())
                 best_doppler = doppler
+
+        # --- Generate 3D Plot for PRN 6 ---
+        if p_prn == -1:
+            fig = plt.figure(figsize=(12, 8))
+            ax = fig.add_subplot(111, projection="3d")
+
+            # Create meshgrid for plotting
+            X_time = np.arange(n_frame)
+            Y_doppler = doppler_range
+            X, Y = np.meshgrid(X_time, Y_doppler)
+
+            Z_power = np.array(all_corrs_3d)
+
+            # Plot the surface
+            ax.plot_surface(X, Y, Z_power, cmap="viridis", edgecolor="none")
+
+            ax.set_title(f"PRN {p_prn} Acquisition: Time-Doppler Correlation")
+            ax.set_xlabel("Code Phase Offset (samples)")
+            ax.set_ylabel("Doppler Shift (Hz)")
+            ax.set_zlabel("Correlation Power")
+            ax.view_init(elev=30, azim=-60)  # Adjust viewing angle
+            plt.show()
+        # ------------------------------------
 
         corrs.sort()
         # XXX: Don't hardcode detection ratio correlation window

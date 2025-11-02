@@ -35,15 +35,10 @@ class CarrierTrackingLoop:
         self.freq_estimate = 0.0
         self.error = 0.0
         # FLL
-        zeta = 0.707
-        wn = fll_bw * 8 * zeta / (4 * zeta**2 + 1)
-        self.fll_k1 = 2 * zeta * wn
-        self.fll_k2 = (wn) ** 2
+        self.fll_w0 = 4 * fll_bw
         # PLL
-        zeta = 0.707
-        wn = pll_bw * 8 * zeta / (4 * zeta**2 + 1)
-        self.pll_k1 = 2 * zeta * wn
-        self.pll_k2 = (wn) ** 2
+        self.pll_w0 = pll_bw / 0.53
+        self.pll_a2 = 1.414 * self.pll_w0
 
         self.n = 0
 
@@ -70,17 +65,20 @@ class CarrierTrackingLoop:
 
         # PLL
         self.error = np.atan(input_signal.imag / input_signal.real)
-        self.sum_e_pll += self.pll_k2 * self.error * self.T
-        self.freq_estimate_pll = self.pll_k1 * self.error + self.sum_e_pll
+        pll_error = self.error / (2 * np.pi)
 
         # FLL
-        d_phi = np.angle(input_signal * np.conj(self.prev_sym))  # [T * rad/s]
-        omega_mes = self._fold_mod_pi(d_phi)  # [T * rad/s]
+        d_phi = np.angle(input_signal * np.conj(self.prev_sym))  # [rad/s / T]
+        fll_error = self._fold_mod_pi(d_phi) / (2 * np.pi)  # [Hz / T]
 
-        self.sum_e += omega_mes
-        self.freq_estimate_fll = self.fll_k1 * omega_mes + (self.sum_e * self.fll_k2) * self.T * 0.5
+        integrator_old = self.integrator
+        self.integrator += (self.fll_w0 * fll_error * self.T) + (
+            (self.pll_w0**2) * pll_error * self.T
+        )
 
-        self.freq_estimate = self.freq_estimate_pll * 1 + self.freq_estimate_fll * 1
+        self.freq_estimate = ((self.integrator + integrator_old) * 0.5) + (
+            self.pll_a2 * self.pll_w0 * pll_error
+        )
 
         self.prev_sym = input_signal
         self.n += 1
@@ -94,7 +92,7 @@ class CarrierTrackingLoop:
         self.freq_estimate_fll = 0.0
         self.error = 0.0
         self.prev_sym = None
-        self.f_ll_integrator = 0
+        self.integrator = 0
         self.sum_e_pll: float = 0
         self.sum_e: float = 0
         self.start_pll = False

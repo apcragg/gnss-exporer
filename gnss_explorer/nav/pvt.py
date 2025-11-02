@@ -205,7 +205,7 @@ class PvtSolver:
                         prn=prn,
                         pseudorange=pseudorange,
                         t_rx=latest_symbol.t_receiver,
-                        t_tx=t_sv,
+                        t_tx=t_tx,
                         ephemerides=eph,
                     )
                 )
@@ -242,15 +242,16 @@ class PvtSolver:
 
         # Initial guess at the center of the earth
         p_hat_user = Vec3d()
-        t_receiver_bias_m = self.t_clock_bias if self.t_clock_bias else 0.0  # [m]
+        t_receiver_bias_m = (self.t_clock_bias) if self.t_clock_bias else 0.0  # [m]
 
         # Least squares iterations
         n_itr = 0
         while n_itr < N_MAX_ITR:
+            # Spacecraft positions at corrected transmission time
             p_svs = [Vec3d(*m.ephemerides.as_ecef(t=m.t_tx)) for m in measurements]
 
             rho_hat = np.array(
-                [np.linalg.norm(p_sv - p_hat_user) + t_receiver_bias_m for p_sv in p_svs]
+                [np.linalg.norm(p_sv - p_hat_user) - t_receiver_bias_m for p_sv in p_svs]
             )
 
             rho = np.array([m.pseudorange for m in measurements])
@@ -258,15 +259,26 @@ class PvtSolver:
 
             h = self._build_h(p_svs=p_svs, p_hat_user=p_hat_user)
 
-            (p_hat_user_update, *_) = np.linalg.lstsq(h, rho_delta, rcond=1e-12)
+            (p_hat_user_update, *_) = np.linalg.lstsq(h, rho_delta, rcond=None)
 
             p_hat_user = p_hat_user + Vec3d(
                 p_hat_user_update[0], p_hat_user_update[1], p_hat_user_update[2]
             )
 
-            t_receiver_bias_m += p_hat_user_update[3]
+            v = rho_delta - h @ p_hat_user_update
+
+            t_receiver_bias_m += p_hat_user_update[3] / nav.C_GPS
             n_itr += 1
-        print(f"ECEF: {p_hat_user}", f"Clock bias: {t_receiver_bias_m / nav.C_GPS:15.9f} sec")
+        print(
+            f"ECEF: {p_hat_user}",
+            f"Clock bias: {t_receiver_bias_m / nav.C_GPS:15.9f} sec",
+        )
+
+        print(
+            f"rss={float(v @ v):.3f} "
+            "residuals_per_sv="
+            + str({m.prn: float(r) for m, r in zip(measurements, v, strict=False)})
+        )
 
         self.p_ecef = p_hat_user
         self.t_clock_bias = t_receiver_bias_m / nav.C_GPS

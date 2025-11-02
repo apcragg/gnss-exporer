@@ -10,7 +10,7 @@ from numpy import typing as npt
 
 from gnss_explorer.nav import nav
 
-DEFAULT_N_CHECK_FOR_LOCK = 200
+DEFAULT_N_CHECK_FOR_LOCK = 2000
 DEFAULT_N_FLYWHEEL_MAX = 10
 
 

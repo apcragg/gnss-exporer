@@ -18,13 +18,13 @@ from numpy import typing as npt
 
 from gnss_explorer.detection import l1ca_detector
 from gnss_explorer.dsp import common
-from gnss_explorer.nav import nav, orbit_plot, pvt
+from gnss_explorer.nav import nav, pvt
 from gnss_explorer.receivers import l1ca
 
 logging.getLogger().setLevel(logging.INFO)
 
 FC_SIGNAL = 1575.420e6
-FS_SIGNAL = 4.0e6 * (1.0 + 12.7e-6)  # add some PPMs
+FS_SIGNAL = 4.0e6
 ACTIVE_PRNS = list(range(32))
 
 N_RX = 100_000
@@ -141,21 +141,21 @@ def main() -> None:
     """TODO."""
     n_load = int(T_LOAD_S * FS_SIGNAL)
 
-    # x_stream = file_source_complex_mmap(
-    #     pathlib.Path("/home/apcragg/Documents/gps.bin"),
-    #     capture_format=CaptureBinaryFormat.FILE_I16,
-    #     n_yield=N_RX,
-    #     n_load=n_load,
-    #     f_shift=0,
-    # )
-
     x_stream = file_source_complex_mmap(
-        pathlib.Path("/home/apcragg/Documents/porch.bin"),
-        capture_format=CaptureBinaryFormat.FILE_NUMPY_C64,
+        pathlib.Path("/home/apcragg/Documents/gps.bin"),
+        capture_format=CaptureBinaryFormat.FILE_I16,
         n_yield=N_RX,
         n_load=n_load,
-        f_shift=25e3,
+        f_shift=0,
     )
+
+    # x_stream = file_source_complex_mmap(
+    #     pathlib.Path("/home/apcragg/Documents/porch.bin"),
+    #     capture_format=CaptureBinaryFormat.FILE_NUMPY_C64,
+    #     n_yield=N_RX,
+    #     n_load=n_load,
+    #     f_shift=25e3,
+    # )
 
     receivers: dict[int, l1ca.L1CAReceiver] = {}
     detectors: dict[int, l1ca_detector.L1CADetector] = {}
@@ -168,9 +168,9 @@ def main() -> None:
         f_c=FC_SIGNAL,
         p_prn=1,
         p_agc_alpha=0.1,
-        f_fll_bw=25,
-        f_pll_bw=5,
-        f_dll_bw=25,
+        f_fll_bw=4,
+        f_pll_bw=18,
+        f_dll_bw=5,
         n_subframe_lock=2,
         n_flywheel_allowed=10,
         b_sync_pattern=np.array([1, 0, 0, 0, 1, 0, 1, 1]),
@@ -181,7 +181,7 @@ def main() -> None:
         prn_config.p_prn = prn
         receivers[prn] = l1ca.L1CAReceiver(config=prn_config, solver=solver)
         detectors[prn] = l1ca_detector.L1CADetector(
-            f_s=FS_SIGNAL, f_max_doppler=10e3, f_step_doppler=250, p_ratio_threshold=1.5
+            f_s=FS_SIGNAL, f_max_doppler=10e3, f_step_doppler=250, p_ratio_threshold=1.6
         )
 
     t_start = time.time()
@@ -221,7 +221,7 @@ def main() -> None:
             continue
         active_eph.append(eph)
         t_subframe = eph.tow - 6
-    orbit_plot.plot_orbits_2d(active_eph, t_start=t_subframe)
+    # orbit_plot.plot_orbits_2d(active_eph, t_start=t_subframe)
 
     for prn in ACTIVE_PRNS:
         if len(receivers[prn].b_symbols) > 0:
@@ -266,7 +266,7 @@ def main() -> None:
             plt.ylabel("Amplitude")
             plt.xlabel("Time (s)")
 
-            t_calc_offset = 0
+            t_calc_offset = 5
             n_off = int(t_calc_offset / nav.T_CODE)
             t_calc_offset = n_off * nav.T_CODE
 
