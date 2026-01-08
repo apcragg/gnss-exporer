@@ -70,6 +70,8 @@ NAV_PREAMBLE = [1, 0, 0, 0, 1, 0, 1, 1]
 ACTIVE_PRNS = list(range(32))
 ALL_SUBFRAMES = set(range(1, N_SUBFRAMES + 1))
 
+N_LEAP_S = 18  # As of September 2025. Last leap second was in 2021.
+
 
 class TelemetryWord(bits.BitStream):
     """NAV telemetry (TLM) word containing the integrity flag.

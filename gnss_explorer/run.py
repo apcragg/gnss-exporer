@@ -18,13 +18,13 @@ from numpy import typing as npt
 
 from gnss_explorer.detection import l1ca_detector
 from gnss_explorer.dsp import common
-from gnss_explorer.nav import nav, orbit_plot, pvt
+from gnss_explorer.nav import nav, pvt
 from gnss_explorer.receivers import l1ca
 
 logging.getLogger().setLevel(logging.INFO)
 
 FC_SIGNAL = 1575.420e6
-FS_SIGNAL = 4.0e6 * (1.0000)  # add some PPMs
+FS_SIGNAL = 4.0e6
 ACTIVE_PRNS = list(range(32))
 
 N_RX = 100_000
@@ -32,10 +32,7 @@ T_LOAD_S = 120
 N_LOAD = int(FS_SIGNAL * T_LOAD_S)
 
 N_YEILD_DEAULT = int(1e5)
-
-# Site location: Berkeley, Alameda County, California, United States
-# 37.858429 lat, -122.273754 lon, 37.00 m alt
-ecef_ant = (-2692314.79174219165, -4263143.23363866005, 3893072.19487998961)
+N_FRAMES_DETECT = 10
 
 
 class CaptureBinaryFormat(enum.Enum):
@@ -117,7 +114,7 @@ def file_source_complex_mmap(
     if len(x) % 2 == 1:
         logging.error("Complex binary file should have even number of samples.")
         raise RuntimeError
-    idx = 0
+    idx = int(4e6)
     n_samples = len(x)
     if n_load:
         n_samples = np.minimum(n_load * 2, n_samples)
@@ -152,6 +149,14 @@ def main() -> None:
         f_shift=0,
     )
 
+    # x_stream = file_source_complex_mmap(
+    #     pathlib.Path("/home/apcragg/Documents/porch.bin"),
+    #     capture_format=CaptureBinaryFormat.FILE_NUMPY_C64,
+    #     n_yield=N_RX,
+    #     n_load=n_load,
+    #     f_shift=25e3,
+    # )
+
     receivers: dict[int, l1ca.L1CAReceiver] = {}
     detectors: dict[int, l1ca_detector.L1CADetector] = {}
 
@@ -163,9 +168,9 @@ def main() -> None:
         f_c=FC_SIGNAL,
         p_prn=1,
         p_agc_alpha=0.1,
-        f_fll_bw=20,
-        f_pll_bw=10,
-        f_dll_bw=10,
+        f_fll_bw=4,
+        f_pll_bw=18,
+        f_dll_bw=5,
         n_subframe_lock=2,
         n_flywheel_allowed=10,
         b_sync_pattern=np.array([1, 0, 0, 0, 1, 0, 1, 1]),
@@ -176,7 +181,7 @@ def main() -> None:
         prn_config.p_prn = prn
         receivers[prn] = l1ca.L1CAReceiver(config=prn_config, solver=solver)
         detectors[prn] = l1ca_detector.L1CADetector(
-            f_s=FS_SIGNAL, f_max_doppler=10e3, f_step_doppler=250, p_ratio_threshold=1.7
+            f_s=FS_SIGNAL, f_max_doppler=10e3, f_step_doppler=250, p_ratio_threshold=1.6
         )
 
     t_start = time.time()
@@ -187,7 +192,7 @@ def main() -> None:
         if prn_to_detect == n_pos:
             if receivers[prn_to_detect].state is l1ca.L1CAReceiverState.IDLE:
                 detection = detectors[prn_to_detect].process(
-                    frame=x[: detectors[prn_to_detect].n_frame],
+                    frame=x[: detectors[prn_to_detect].n_frame * N_FRAMES_DETECT],
                     p_prn=prn_to_detect,
                 )
                 if detection:
@@ -216,7 +221,7 @@ def main() -> None:
             continue
         active_eph.append(eph)
         t_subframe = eph.tow - 6
-    orbit_plot.plot_orbits_2d(active_eph, t_start=t_subframe)
+    # orbit_plot.plot_orbits_2d(active_eph, t_start=t_subframe)
 
     for prn in ACTIVE_PRNS:
         if len(receivers[prn].b_symbols) > 0:
@@ -232,7 +237,7 @@ def main() -> None:
             data_c_n0_nwpr = np.convolve(data_c_n0_nwpr, [0.1] * 10, mode="full")[: -(10 - 1)]
 
             plt.figure()
-            ax1 = plt.subplot(2, 3, 1)
+            ax1 = plt.subplot(2, 4, 1)
             plt.title(f"Symbols - PRN {prn}")
             plt.grid()
             plt.xlabel("Time (s)")
@@ -240,20 +245,20 @@ def main() -> None:
             plt.plot(t_symbol_loop, data_imag, ".r")
             plt.axis((0.0, T_LOAD_S, -1.25, 1.25))
 
-            ax2 = plt.subplot(2, 3, 2, sharex=ax1)
-            plt.title(f"(XXX carrier phase) AGC Loop Gain - PRN {prn}")
+            ax2 = plt.subplot(2, 4, 2, sharex=ax1)
+            plt.title(f"AGC Loop Gain - PRN {prn}")
             plt.grid()
             plt.xlabel("Time (s)")
-            plt.plot(t_pseudo_symbol_loop, receivers[prn].b_carrier_phase)
+            plt.plot(t_pseudo_symbol_loop, receivers[prn].b_gain)
 
-            ax2 = plt.subplot(2, 3, 3, sharex=ax1)
+            ax3 = plt.subplot(2, 4, 3, sharex=ax2)
             plt.title(f"C/N_0 - PRN {prn}")
             plt.grid()
             plt.xlabel("Time (s)")
             plt.plot(t_symbol_loop, data_c_n0_mm, "bo-")
             plt.plot(t_symbol_loop, data_c_n0_nwpr, "ro-")
 
-            ax3 = plt.subplot(2, 3, 4, sharex=ax2)
+            ax4 = plt.subplot(2, 4, 4, sharex=ax3)
             plt.title("Psudeo Symbols")
             plt.grid()
             plt.plot(t_pseudo_symbol_loop[:], np.real(receivers[prn].b_pseudo_symbols), "bo-")
@@ -261,7 +266,7 @@ def main() -> None:
             plt.ylabel("Amplitude")
             plt.xlabel("Time (s)")
 
-            t_calc_offset = 2
+            t_calc_offset = 5
             n_off = int(t_calc_offset / nav.T_CODE)
             t_calc_offset = n_off * nav.T_CODE
 
@@ -273,7 +278,7 @@ def main() -> None:
             t_resid = np.arange(-n_off, -n_off + len(b_code_phase))
             b_code_resid = (b_code_phase - resid(t_resid)) * 1e9 * FS_SIGNAL
 
-            ax4 = plt.subplot(2, 3, 5, sharex=ax3)
+            ax5 = plt.subplot(2, 4, 5, sharex=ax4)
             plt.plot(t_pseudo_symbol_loop, b_code_resid)
             plt.vlines(
                 t_calc_offset, min(b_code_resid), max(b_code_resid), color="k", linestyles="dashed"
@@ -283,12 +288,23 @@ def main() -> None:
             plt.ylabel("Nanoseconds")
             plt.grid()
 
-            plt.subplot(2, 3, 6, sharex=ax4)
+            ax6 = plt.subplot(2, 4, 6, sharex=ax5)
             plt.title(f"Carrier Estimate - PRN {prn}")
             plt.grid()
             plt.xlabel("Time (s)")
             plt.plot(t_pseudo_symbol_loop, receivers[prn].b_carrier_est)
 
+            ax7 = plt.subplot(2, 4, 7, sharex=ax6)
+            plt.title(f"Code Error - PRN {prn}")
+            plt.grid()
+            plt.xlabel("Time (s)")
+            plt.plot(t_pseudo_symbol_loop, receivers[prn].b_code_error)
+
+            plt.subplot(2, 4, 8, sharex=ax7)
+            plt.title(f"Code Phase Uncorrected - PRN {prn}")
+            plt.grid()
+            plt.xlabel("Time (s)")
+            plt.plot(t_pseudo_symbol_loop, receivers[prn].b_code_phase_uncorr)
     plt.show()
 
 

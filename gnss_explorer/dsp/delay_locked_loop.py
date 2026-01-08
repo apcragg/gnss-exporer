@@ -16,15 +16,23 @@ class DelayLockedLoop:
         self.period = 1.0 / sample_rate
 
         # Loop filter design
-        zeta = 0.707
-        wn = 8 * bandwidth * zeta / (4 * zeta**2 + 1)
-
-        self.k1 = 2 * zeta * wn * self.period
-        self.k2 = (wn * self.period) ** 2
+        self.update_noise_bw(noise_bw_hz=bandwidth)
 
         self.offset = 0.0  # Current offset in samples
         self.freq_est_hz = 0.0
         self.timing_error = 0.0
+
+    def update_noise_bw(self, noise_bw_hz: float) -> None:
+        """Update loop filter coefficients for new noise bandwidth.
+
+        Args:
+            noise_bw: Noise bandwidth in Hz.
+        """
+        zeta = 0.707
+        wn = 8 * noise_bw_hz * zeta / (4 * zeta**2 + 1)
+
+        self.k1 = 2 * zeta * wn * self.period
+        self.k2 = (wn * self.period) ** 2
 
     def update(self, timing_error: float) -> None:
         """Update the delay offset based on the timing error from the discriminator.
@@ -38,14 +46,14 @@ class DelayLockedLoop:
         """
         self.timing_error = timing_error
         # Compute the control signal using the PI controller
+        self.timing_error = timing_error
         self.freq_est_hz += self.k2 * timing_error
         # Update the offset
         self.offset += self.k1 * timing_error
 
-    def step(self, carrier_freq_est: float = 0.0) -> None:
+    def step(self, carrier_freq_est: float = 0.0, start_aiding: bool = False) -> None:
         """Step the loop using an optional aiding frequency."""
         # The relationship for L1 is f_code_doppler = f_carrier_doppler / 1540
-        # T_CODE is 1e-3, so we must scale correctly.
         # The carrier_freq_est is in Hz. The DLL freq_est is in samples/ms.
         aiding_term = carrier_freq_est / 1540.0  # Divided by N_P_SYMBOLS
         self.offset += self.freq_est_hz * self.period - (aiding_term * self.period)

@@ -172,9 +172,10 @@ class L1CAReceiver:
         # Clear buffers
         self.b_samples = np.zeros(self.config.n_frame, dtype=np.complex64)
         self.b_gain = []
-        self.b_carrier_phase = []
-        self.b_carrier_est = []
         self.b_code_phase = []
+        self.b_code_error = []
+        self.b_carrier_est = []
+        self.b_code_phase_uncorr = []
         self.b_pseudo_symbols = []
         self.b_symbols = []
 
@@ -229,18 +230,23 @@ class L1CAReceiver:
     def _pseudo_symbol_tracking(
         self, samples: npt.NDArray[np.complex64], n_frame_global_pos: int
     ) -> symbol_sync.L1CAPseudoSymbol:
+        f_total_carrier_freq = self.f_doppler + (
+            self.carrier_tracking_loop.freq_estimate / (2 * np.pi)
+        )
+
         self.p_last_nco_phase = common.freq_shift(
             samples,
             fs=self.config.f_s,
-            f_shift=self.f_doppler,
+            f_shift=f_total_carrier_freq,
             phase=self.p_last_nco_phase,
         )
 
-        self.p_last_nco_phase_carrier = common.freq_shift(
-            samples,
-            fs=self.config.f_s,
-            f_shift=(self.carrier_tracking_loop.freq_estimate / (2 * np.pi)),
-            phase=self.p_last_nco_phase_carrier,
+        x_corr_prompt = self._run_dll_discrim(samples=samples)
+        pseudo_symbol = x_corr_prompt * self.agc_loop.gain
+        self.carrier_tracking_loop.update(pseudo_symbol)
+
+        self.delay_locked_loop.step(
+            f_total_carrier_freq, start_aiding=self.carrier_tracking_loop.start_pll
         )
 
         total_shift_hz = self.carrier_tracking_loop.freq_estimate / (2 * np.pi)
@@ -248,21 +254,21 @@ class L1CAReceiver:
         x_corr_prompt = self._run_dll_discrim(samples=samples)
         self.delay_locked_loop.step(carrier_freq_est=total_shift_hz)
         pseudo_symbol = x_corr_prompt * self.agc_loop.gain
-
         self.carrier_tracking_loop.update(pseudo_symbol)
 
         # T/2 correction
-        self.p_last_nco_phase_carrier *= np.exp(
-            -1j * self.carrier_tracking_loop.freq_estimate * self.carrier_tracking_loop.T / 2
-        )
+        # Carrier estimate is for the middle of the integration window
+        # self.p_last_nco_phase_carrier *= np.exp(
+        #     -1j * self.carrier_tracking_loop.freq_estimate * self.carrier_tracking_loop.T / 2
+        # )
 
         self.agc_loop.update(x_corr_prompt)
 
-        if self.delay_locked_loop.offset >= HALF_SAMPLE:
-            self.delay_locked_loop.offset -= self.config.f_oversample
+        if self.delay_locked_loop.offset > HALF_SAMPLE:
+            self.delay_locked_loop.offset -= self.config.f_oversample * 1
             self.n_code_track_offset = -1
-        elif self.delay_locked_loop.offset <= -HALF_SAMPLE:
-            self.delay_locked_loop.offset += self.config.f_oversample
+        elif self.delay_locked_loop.offset < -HALF_SAMPLE:
+            self.delay_locked_loop.offset += self.config.f_oversample * 1
             self.n_code_track_offset = 1
         else:
             self.n_code_track_offset = 0
@@ -274,7 +280,7 @@ class L1CAReceiver:
             - (self.delay_locked_loop.offset / self.config.f_oversample)
         ) / self.config.f_s
 
-        self.b_gain.append(self.agc_loop.gain)
+        self.b_gain.append(self.carrier_tracking_loop.error)
         self.b_pseudo_symbols.append(pseudo_symbol)
         self.b_code_phase.append(t_receiver)
         self.b_carrier_phase.append(self.delay_locked_loop.timing_error)
@@ -386,9 +392,12 @@ class L1CAReceiver:
         self.n_code_detection_offset = 0
 
         n_total_len = len(x)
-        while n_input_buf_pos < n_total_len - 1:
+        # This used to be `n_total_len - 1``and that caused the 4001 global pos diff weirdness
+        # XXX: Why?
+        while n_input_buf_pos < n_total_len:
             n_samples_needed = self.config.n_frame - self.n_b_samples_pos
             n_samples_remaining = n_total_len - n_input_buf_pos
+
             # If out of samples, store them and wait for more
             if n_samples_remaining < n_samples_needed:
                 self.b_samples[
