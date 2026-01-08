@@ -5,14 +5,14 @@ import logging
 
 import numpy as np
 
-N_WINDOW_DEFAULT_ = 4
+N_WINDOW_DEFAULT = 4
 
 
 class AgcMode(enum.Enum):
     """Automatic gain control modes."""
 
-    AGC_MOVING_AVERAGE = enum.auto()
-    AGC_MODE_SECOND_ORDER = enum.auto()
+    MOVING_AVERAGE = enum.auto()
+    SECOND_ORDER = enum.auto()
 
 
 class AutomaticGainControl:
@@ -25,8 +25,8 @@ class AutomaticGainControl:
         alpha: float,
         *,
         amplitude: float = 1.0,
-        agc_mode: AgcMode = AgcMode.AGC_MOVING_AVERAGE,
-        n_window: int = N_WINDOW_DEFAULT_,
+        agc_mode: AgcMode = AgcMode.MOVING_AVERAGE,
+        n_window: int = N_WINDOW_DEFAULT,
     ) -> None:
         """Create gain control loop."""
         self.alpha = alpha
@@ -42,7 +42,7 @@ class AutomaticGainControl:
 
         gk = self.amplitude / np.sqrt(np.mean(np.power(abs(self.window), 2)))
 
-        if self.agc_mode == AgcMode.AGC_MOVING_AVERAGE:
+        if self.agc_mode == AgcMode.MOVING_AVERAGE:
             self.gain = self.gain * (1 - self.alpha) + (gk * self.alpha)
         else:
             logging.error(f"Unsupported AGC Mode {self.agc_mode}")

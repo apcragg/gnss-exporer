@@ -1,4 +1,4 @@
-"""TODO."""
+"""PVT (Position, Velocity, Time) Solver."""
 
 import dataclasses
 import enum
@@ -50,7 +50,7 @@ class Vec3d:
 
 @dataclasses.dataclass()
 class PvtSolverConfig:
-    """Cofiguration class for the Position-Velocity-Time solver."""
+    """Configuration class for the Position-Velocity-Time solver."""
 
     solution_period_hz: float
 
@@ -74,6 +74,11 @@ class PseudorangeMeasurement(NamedTuple):
 
 
 class PvtSolver:
+    """Position-Velocity-Time (PVT) Solver.
+
+    Solves for the receiver position and clock bias using pseudorange measurements
+    and satellite ephemerides.
+    """
     config: PvtSolverConfig
     candidate_ephemerides: dict[int, ephemeris.GpsEphemeris | None]
     ephemerides: dict[int, ephemeris.GpsEphemeris | None]

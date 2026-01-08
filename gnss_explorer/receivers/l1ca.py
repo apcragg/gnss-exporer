@@ -64,7 +64,7 @@ class L1CAFixedConfig:
 
 
 class L1CAReceiverState(enum.Enum):
-    """TODO."""
+    """State of the L1 C/A Receiver."""
 
     IDLE = enum.auto()
     START = enum.auto()
@@ -100,7 +100,7 @@ class L1CAReceiver:
     p_dll_err_accumulate: float
 
     def __init__(self, config: L1CAFixedConfig, solver: pvt.PvtSolver) -> None:
-        """TODO."""
+        """Initialize the L1 C/A Receiver."""
         self.config = config
         self.state = L1CAReceiverState.IDLE
         self.solver = solver
@@ -129,7 +129,7 @@ class L1CAReceiver:
         self.reset()
 
     def update_detection(self, detection: l1ca_detector.CodeDetection) -> None:
-        """TODO."""
+        """Update the receiver with a new code detection."""
         if self.state == L1CAReceiverState.IDLE:
             self.reset()
             self.n_code_detection_offset = detection.n_offset
@@ -256,12 +256,6 @@ class L1CAReceiver:
         pseudo_symbol = x_corr_prompt * self.agc_loop.gain
         self.carrier_tracking_loop.update(pseudo_symbol)
 
-        # T/2 correction
-        # Carrier estimate is for the middle of the integration window
-        # self.p_last_nco_phase_carrier *= np.exp(
-        #     -1j * self.carrier_tracking_loop.freq_estimate * self.carrier_tracking_loop.T / 2
-        # )
-
         self.agc_loop.update(x_corr_prompt)
 
         if self.delay_locked_loop.offset > HALF_SAMPLE:
@@ -283,8 +277,9 @@ class L1CAReceiver:
         self.b_gain.append(self.carrier_tracking_loop.error)
         self.b_pseudo_symbols.append(pseudo_symbol)
         self.b_code_phase.append(t_receiver)
-        self.b_carrier_phase.append(self.delay_locked_loop.timing_error)
-        self.b_carrier_est.append(self.carrier_tracking_loop.sum_e)
+        self.b_code_error.append(self.delay_locked_loop.timing_error)
+        self.b_code_phase_uncorr.append(self.delay_locked_loop.offset)
+        self.b_carrier_est.append(self.carrier_tracking_loop.integrator)
 
         return symbol_sync.L1CAPseudoSymbol(
             p_prn=self.config.p_prn,
@@ -370,7 +365,7 @@ class L1CAReceiver:
         self.n_codes_processed += 1
 
     def update(self, x: npt.NDArray[np.complex64], n_pos: int) -> None:
-        """TODO.
+        """Update the receiver with new samples.
 
         Args:
             x: Buffer of new complex samples

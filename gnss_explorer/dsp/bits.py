@@ -1,19 +1,19 @@
-"""TODO."""
+"""Bit manipulation utilities."""
 
 
 class BitStream:
-    """TODO."""
+    """Helper class for extracting fields from a bitstream."""
 
     bitstream: list[int]
 
     def __init__(self, bitstream: list[int]) -> None:
-        """TODO."""
+        """Initialize the BitStream helper."""
         self.bitstream = bitstream
 
     def _bitshift(self, bits: list[int], *, twos_complement: bool = False) -> int:
-        """Calculate Integer from list of bits where LSBs are first.
+        """Calculate Integer from list of bits.
 
-        Assumes MSB is first.
+        Assumes MSB is first (index 0).
         """
         out = 0
         for bit in bits:

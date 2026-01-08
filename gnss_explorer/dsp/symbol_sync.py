@@ -16,31 +16,34 @@ DEFAULT_N_FLYWHEEL_MAX = 10
 
 @dataclasses.dataclass()
 class L1CASymbol:
-    """TODO."""
+    """L1 C/A Nav Symbol.
 
-    p_prn: int
-    symbol: np.complex64
-    n_count: (
-        int | None
-    )  # Count between [0..300] indicating which position the symbol is in the SubFrame
-    t_receiver: float  # Time relative to the receiver epoch [secs]
-    # Signal quality metrics
-    c_n0_est_mm: float
-    c_n0_est_nwpr: float
+    Attributes:
+        p_prn: PRN of the satellite.
+        symbol: Complex symbol.
+        n_count: Count between [0..300] indicating which position the symbol is in the SubFrame.
+        t_receiver: Time relative to the receiver epoch [secs].
+        c_n0_est_mm: C/N0 estimate using the moment method.
+        c_n0_est_nwpr: C/N0 estimate using the narrowband/wideband power ratio method.
+
+    """
 
 
 @dataclasses.dataclass()
 class L1CAPseudoSymbol:
-    """TODO."""
+    """L1 C/A Pseudo Symbol.
 
-    p_prn: int
-    pseudo_symbol: np.complex64
-    n_count: int | None  # Count between [0..19] indicating which position the pseduo symbol is
-    t_receiver: float  # Time relative to the receiver epoch [secs]
+    Attributes:
+        p_prn: PRN of the satellite.
+        pseudo_symbol: Complex pseudo symbol.
+        n_count: Count between [0..19] indicating which position the pseduo symbol is.
+        t_receiver: Time relative to the receiver epoch [secs].
+
+    """
 
 
 class SymbolSyncState(enum.Enum):
-    """TODO."""
+    """Symbol Synchronization Loop State."""
 
     UNLOCKED = enum.auto()
     CHECK = enum.auto()
@@ -49,7 +52,11 @@ class SymbolSyncState(enum.Enum):
 
 
 class SymbolSync:
-    """TODO."""
+    """Symbol Synchronization Loop.
+
+    Finds the correct alignment of the 20ms Nav Symbols from the 1ms Pseudo Symbols.
+
+    """
 
     state: SymbolSyncState
     b_pseudo_symbols: list[L1CAPseudoSymbol]
@@ -64,7 +71,14 @@ class SymbolSync:
         n_check_for_lock: int = DEFAULT_N_CHECK_FOR_LOCK,
         n_flywheel_max: int = DEFAULT_N_FLYWHEEL_MAX,
     ) -> None:
-        """TODO."""
+        """Initialize the Symbol Sync Loop.
+
+        Args:
+            p_prn: PRN of the satellite.
+            n_check_for_lock: Number of symbols to check before declaring lock.
+            n_flywheel_max: Number of symbols to flywheel before declaring unlock.
+
+        """
         self.p_prn = p_prn
         self.n_check_for_lock = n_check_for_lock
         self.n_flywheel_max = n_flywheel_max
@@ -210,7 +224,7 @@ class SymbolSync:
         self.state = SymbolSyncState.CHECK
 
     def reset(self) -> None:
-        """TODO."""
+        """Reset the Symbol Sync Loop."""
         self.state = SymbolSyncState.UNLOCKED
         self.b_pseudo_symbols = (
             [

@@ -14,7 +14,7 @@ from gnss_explorer.nav import nav
 
 
 class FrameSyncState(enum.Enum):
-    """TODO."""
+    """Frame Synchronization State."""
 
     SEARCHING = enum.auto()
     FLYWHEEL = enum.auto()
@@ -23,7 +23,7 @@ class FrameSyncState(enum.Enum):
 
 @dataclasses.dataclass
 class SyncTheory:
-    """TODO."""
+    """Hypothesis for frame synchronization."""
 
     start_offset: int
     phase: bool
@@ -31,7 +31,10 @@ class SyncTheory:
 
 
 class FrameSync:
-    """TODO."""
+    """Frame Synchronization.
+
+    Finds the start of the 300-bit subframe within the stream of navigation symbols.
+    """
 
     state: FrameSyncState
     b_sync_pattern: npt.NDArray[np.int_]
@@ -107,7 +110,7 @@ class FrameSync:
                 break
 
     def process(self, symbol: symbol_sync.L1CASymbol) -> nav.NavSubframe | None:
-        """TODO."""
+        """Process a new symbol and potentially produce a subframe."""
         bit = 1 if symbol.symbol.real > 0.0 else 0
         self.b_subframe_bits = [bit, *self.b_subframe_bits[:-1]]
         self.b_subframe_symbols = [symbol, *self.b_subframe_symbols[:-1]]
@@ -157,7 +160,7 @@ class FrameSync:
         return parity
 
     def publish_subframe(self, n_subframe: int = 0) -> nav.NavSubframe | None:
-        """TODO."""
+        """Publish the current buffer as a subframe."""
         offset = n_subframe * nav.N_BITS_SUBFRAME
         logging.debug(f"Publishing subframe at offset {offset}, Invert: {self.phase}")
 

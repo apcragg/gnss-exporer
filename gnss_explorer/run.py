@@ -31,7 +31,7 @@ N_RX = 100_000
 T_LOAD_S = 120
 N_LOAD = int(FS_SIGNAL * T_LOAD_S)
 
-N_YEILD_DEAULT = int(1e5)
+N_YIELD_DEFAULT = int(1e5)
 N_FRAMES_DETECT = 10
 
 
@@ -60,7 +60,7 @@ class CaptureBinaryFormat(enum.Enum):
 def file_source_complex_mmap(
     file_path: pathlib.Path,
     capture_format: CaptureBinaryFormat,
-    n_yield: int = N_YEILD_DEAULT,
+    n_yield: int = N_YIELD_DEFAULT,
     *,
     f_shift: float = 0.0,
     n_load: float | None = None,
@@ -77,7 +77,7 @@ def file_source_complex_mmap(
             are `CaptureBinaryFormat.FILE_I8`, `FILE_I16`, or
             `FILE_NUMPY_C64`.
         n_yield: Number of **complex** samples to emit per iteration
-            (defaults to ``N_YEILD_DEAULT``). Internally we load
+            (defaults to ``N_YIELD_DEFAULT``). Internally we load
             ``2 * n_yield`` scalar values because the file is
             interleaved I/Q.
         f_shift: Frequency shift in hertz to apply to the block before
@@ -138,7 +138,7 @@ def file_source_complex_mmap(
 
 
 def main() -> None:
-    """TODO."""
+    """Run the GNSS Receiver."""
     n_load = int(T_LOAD_S * FS_SIGNAL)
 
     x_stream = file_source_complex_mmap(
@@ -148,14 +148,6 @@ def main() -> None:
         n_load=n_load,
         f_shift=0,
     )
-
-    # x_stream = file_source_complex_mmap(
-    #     pathlib.Path("/home/apcragg/Documents/porch.bin"),
-    #     capture_format=CaptureBinaryFormat.FILE_NUMPY_C64,
-    #     n_yield=N_RX,
-    #     n_load=n_load,
-    #     f_shift=25e3,
-    # )
 
     receivers: dict[int, l1ca.L1CAReceiver] = {}
     detectors: dict[int, l1ca_detector.L1CADetector] = {}
@@ -221,7 +213,6 @@ def main() -> None:
             continue
         active_eph.append(eph)
         t_subframe = eph.tow - 6
-    # orbit_plot.plot_orbits_2d(active_eph, t_start=t_subframe)
 
     for prn in ACTIVE_PRNS:
         if len(receivers[prn].b_symbols) > 0:
@@ -270,23 +261,26 @@ def main() -> None:
             n_off = int(t_calc_offset / nav.T_CODE)
             t_calc_offset = n_off * nav.T_CODE
 
-            b_code_phase_trunc = b_code_phase[n_off:]
-            resid = np.polynomial.polynomial.Polynomial.fit(
-                range(len(b_code_phase_trunc)), b_code_phase_trunc, deg=2
-            )
-
-            t_resid = np.arange(-n_off, -n_off + len(b_code_phase))
-            b_code_resid = (b_code_phase - resid(t_resid)) * 1e9 * FS_SIGNAL
-
             ax5 = plt.subplot(2, 4, 5, sharex=ax4)
-            plt.plot(t_pseudo_symbol_loop, b_code_resid)
-            plt.vlines(
-                t_calc_offset, min(b_code_resid), max(b_code_resid), color="k", linestyles="dashed"
-            )
-            plt.title("Code Phase Residual")
-            plt.xlabel("Time (s)")
-            plt.ylabel("Nanoseconds")
-            plt.grid()
+            b_code_phase_trunc = b_code_phase[n_off:]
+            if len(b_code_phase_trunc) > 3:
+                resid = np.polynomial.polynomial.Polynomial.fit(
+                    range(len(b_code_phase_trunc)), b_code_phase_trunc, deg=2
+                )
+
+                t_resid = np.arange(-n_off, -n_off + len(b_code_phase))
+                b_code_resid = (b_code_phase - resid(t_resid)) * 1e9 * FS_SIGNAL
+
+                plt.plot(t_pseudo_symbol_loop, b_code_resid)
+                plt.vlines(
+                    t_calc_offset, min(b_code_resid), max(b_code_resid), color="k", linestyles="dashed"
+                )
+                plt.title("Code Phase Residual")
+                plt.xlabel("Time (s)")
+                plt.ylabel("Nanoseconds")
+                plt.grid()
+            else:
+                logging.warning(f"PRN {prn}: Not enough data for polynomial fit (need > 5s).")
 
             ax6 = plt.subplot(2, 4, 6, sharex=ax5)
             plt.title(f"Carrier Estimate - PRN {prn}")
